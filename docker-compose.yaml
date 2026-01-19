@@ -1,0 +1,10 @@
+version: "3"
+
+services:
+  llamaedge-llama32-1b:
+    image: hudzy/llamaedge:llama3.2-1b
+    container_name: llamaedge-llama32-1b
+    ports:
+      - 8079:8080
+    restart: unless-stopped
+

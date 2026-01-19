@@ -1,0 +1,55 @@
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG LLAMAEDGE_VERSION='0.28.1'
+ARG WASMEDGE_VERSION='0.16.1'
+ARG MODEL_URL='https://huggingface.co/second-state/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q5_K_M.gguf'
+# https://github.com/LlamaEdge/LlamaEdge/blob/main/crates/chat-prompts/src/lib.rs
+ARG PROMPT_FORMAT='gemma-3'
+# ARG PROMPT_FORMAT='gemma-instruct'
+ARG CONTEXT_SIZE=24576
+ARG TEMPERATURE=0.8
+
+RUN apt-get update && \
+  apt-get install -y curl git python3 && \
+  curl -sSf https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | bash -s -- --version ${WASMEDGE_VERSION} --plugins wasi_nn-ggml wasmedge_rustls -p /usr/local && \
+  rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Download the llamaedge api server
+RUN curl -L -o llama-api-server.wasm https://github.com/LlamaEdge/LlamaEdge/releases/download/${LLAMAEDGE_VERSION}/llama-api-server.wasm
+
+# Download the model file
+RUN curl -L -o $(basename $MODEL_URL) $MODEL_URL
+
+# Generate the init script
+# https://github.com/LlamaEdge/LlamaEdge/blob/main/llama-api-server/README.md#cli-options-for-the-api-server
+RUN cat > /app/init.sh <<EOF
+#!/bin/bash
+set -e
+MODEL_FILE=$(basename $MODEL_URL)
+wasmedge \\
+  --dir .:. \\
+  --nn-preload "default:GGML:AUTO:\$MODEL_FILE" \\
+  llama-api-server.wasm \\
+  --prompt-template "$PROMPT_FORMAT" \\
+  --ctx-size "$CONTEXT_SIZE" \\
+  --model-name "\$MODEL_FILE" \\
+  --temp "$TEMPERATURE" \\
+  --socket-addr 0.0.0.0:8080 \\
+  --web-ui chatbot-ui
+EOF
+
+RUN chmod +x /app/init.sh
+
+ARG LLAMAEDGE_USER="llamaedge"
+RUN adduser --disabled-password --gecos '' $LLAMAEDGE_USER && \
+  chown -R ${LLAMAEDGE_USER}:0 /app && \
+  chmod -R g=u /app
+USER $LLAMAEDGE_USER
+
+# Execute the API server
+EXPOSE 8080
+ENTRYPOINT ["/bin/bash"]
+CMD ["/app/init.sh"]
