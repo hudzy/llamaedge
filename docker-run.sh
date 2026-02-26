@@ -117,7 +117,7 @@ if ! CONTAINER_ID=$(docker run -d \
     --cpus="$CPUS" \
     --memory="$MEMORY" \
     --restart unless-stopped \
-    --health-cmd='curl -f http://localhost:8080/health || exit 1' \
+    --health-cmd='curl -f http://localhost:8080/v1/models || exit 1' \
     --health-interval=30s \
     --health-timeout=10s \
     --health-start-period=60s \

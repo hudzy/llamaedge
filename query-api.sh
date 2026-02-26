@@ -93,8 +93,8 @@ fi
 check_dependencies
 
 log "Checking API connectivity..."
-if ! curl -sf --connect-timeout 5 "${API_BASE_URL}/health" >/dev/null 2>&1; then
-    if ! curl -sf --connect-timeout 5 "${API_BASE_URL}/models" >/dev/null 2>&1; then
+if ! curl -sf --connect-timeout 5 "${API_BASE_URL}/v1/models" >/dev/null 2>&1; then
+    if ! curl -sf --connect-timeout 5 "${API_BASE_URL}/echo" >/dev/null 2>&1; then
         error "Cannot connect to API at ${API_BASE_URL}"
         error "Make sure the container is running: docker ps | grep llamaedge"
         exit 1
@@ -166,7 +166,7 @@ else
         -d "$PAYLOAD")
 
     HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-    BODY=$(echo "$RESPONSE" | head -n -1)
+    BODY=$(echo "$RESPONSE" | sed '$d')
 
     if [[ "$HTTP_CODE" -ge 400 ]]; then
         error "API returned HTTP $HTTP_CODE"

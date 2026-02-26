@@ -73,7 +73,6 @@ jobs:
           images: hudzy/llamaedge
           tags: |
             type=raw,value=${{ matrix.model }}
-            type=raw,value=${{ matrix.model }}-{{sha}}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -146,7 +145,6 @@ jobs:
           images: hudzy/llamaedge
           tags: |
             type=raw,value=${{ github.event.inputs.model }}
-            type=raw,value=${{ github.event.inputs.model }}-{{sha}}
 
       - name: Build and push
         uses: docker/build-push-action@v6

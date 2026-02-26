@@ -1,7 +1,7 @@
 FROM ubuntu:22.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG LLAMAEDGE_VERSION=0.28.1
+ARG LLAMAEDGE_VERSION=0.29.0
 ARG WASMEDGE_VERSION=0.16.1
 ARG MODEL_URL
 ARG PROMPT_FORMAT
@@ -42,7 +42,7 @@ USER llamaedge
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
+  CMD curl -f http://localhost:8080/v1/models || exit 1
 
 STOPSIGNAL SIGTERM
 
