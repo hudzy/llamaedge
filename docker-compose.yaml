@@ -1,10 +1,72 @@
-version: "3"
-
 services:
-  llamaedge-llama32-1b:
-    image: hudzy/llamaedge:llama3.2-1b
-    container_name: llamaedge-llama32-1b
+  qwen3-0.6b:
+    image: hudzy/llamaedge:qwen3-0.6b
+    build:
+      context: .
+      args:
+        MODEL_URL: https://huggingface.co/second-state/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q5_K_M.gguf
+        PROMPT_FORMAT: qwen3-no-think
+        CONTEXT_SIZE: "24576"
+    container_name: llamaedge-qwen3-0.6b
     ports:
-      - 8079:8080
+      - "8082:8080"
+    cpus: 4.0
+    mem_limit: 6g
     restart: unless-stopped
+    profiles:
+      - qwen
+      - all
 
+  llama3.2-1b:
+    image: hudzy/llamaedge:llama3.2-1b
+    build:
+      context: .
+      args:
+        MODEL_URL: https://huggingface.co/second-state/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q5_K_M.gguf
+        PROMPT_FORMAT: llama-3-chat
+        CONTEXT_SIZE: "24576"
+    container_name: llamaedge-llama3.2-1b
+    ports:
+      - "8079:8080"
+    cpus: 4.0
+    mem_limit: 6g
+    restart: unless-stopped
+    profiles:
+      - llama
+      - all
+
+  gemma3-1b:
+    image: hudzy/llamaedge:gemma3-1b
+    build:
+      context: .
+      args:
+        MODEL_URL: https://huggingface.co/second-state/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q5_K_M.gguf
+        PROMPT_FORMAT: gemma-3
+        CONTEXT_SIZE: "24576"
+    container_name: llamaedge-gemma3-1b
+    ports:
+      - "8081:8080"
+    cpus: 4.0
+    mem_limit: 6g
+    restart: unless-stopped
+    profiles:
+      - gemma
+      - all
+
+  gemma3-270m:
+    image: hudzy/llamaedge:gemma3-270m
+    build:
+      context: .
+      args:
+        MODEL_URL: https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/main/gemma-3-270m-it-Q5_K_M.gguf
+        PROMPT_FORMAT: gemma-3
+        CONTEXT_SIZE: "8192"
+    container_name: llamaedge-gemma3-270m
+    ports:
+      - "8083:8080"
+    cpus: 2.0
+    mem_limit: 4g
+    restart: unless-stopped
+    profiles:
+      - gemma
+      - all

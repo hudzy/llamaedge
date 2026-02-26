@@ -1,0 +1,12 @@
+.git
+.github
+.gitignore
+.editorconfig
+*.md
+!README.md
+LICENSE
+Makefile
+*.txt
+*.sh
+.DS_Store
+.env*

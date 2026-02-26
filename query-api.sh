@@ -2,41 +2,26 @@
 
 set -euo pipefail
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
-NC='\033[0m'
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly MAGENTA='\033[0;35m'
+readonly NC='\033[0m'
 
-# Configuration
 API_BASE_URL="${API_BASE_URL:-http://localhost:8082}"
 MODEL="${MODEL:-qwen3-0.6b}"
 TEMPERATURE="${TEMPERATURE:-0.7}"
 MAX_TOKENS="${MAX_TOKENS:-1024}"
-TIMEOUT=300
+TIMEOUT="${TIMEOUT:-300}"
 
-# Helper functions
-log() {
-    echo -e "${BLUE}[$(date +'%H:%M:%S')]${NC} $1"
-}
-
-success() {
-    echo -e "${GREEN}✓ $1${NC}"
-}
-
-error() {
-    echo -e "${RED}✗ Error: $1${NC}"
-}
-
-warn() {
-    echo -e "${YELLOW}⚠ $1${NC}"
-}
+log()     { echo -e "${BLUE}[$(date +'%H:%M:%S')]${NC} $1"; }
+success() { echo -e "${GREEN}[ok] $1${NC}"; }
+error()   { echo -e "${RED}[error] $1${NC}" >&2; }
 
 usage() {
-    cat << EOF
+    cat <<EOF
 ${CYAN}LlamaEdge OpenAI API Query Tool${NC}
 
 Usage: $0 [OPTIONS] "<prompt>"
@@ -51,6 +36,8 @@ Options:
   -u, --url URL               API base URL (default: $API_BASE_URL)
   -h, --help                  Show this help message
 
+Environment variables: API_BASE_URL, MODEL, TEMPERATURE, MAX_TOKENS, TIMEOUT
+
 Examples:
   $0 "What is the capital of France?"
   $0 -m llama3.2-1b -t 0.5 "Explain quantum computing"
@@ -61,42 +48,33 @@ EOF
     exit 0
 }
 
-# Parse arguments
+check_dependencies() {
+    local missing=()
+    for cmd in curl jq; do
+        command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        error "Missing required commands: ${missing[*]}"
+        exit 1
+    fi
+}
+
 PROMPT=""
 STREAM=false
 ENDPOINT="chat/completions"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -m|--model)
-            MODEL="$2"
-            shift 2
-            ;;
-        -t|--temperature)
-            TEMPERATURE="$2"
-            shift 2
-            ;;
-        -l|--max-tokens)
-            MAX_TOKENS="$2"
-            shift 2
-            ;;
-        -s|--stream)
-            STREAM=true
-            shift
-            ;;
-        -c|--chat)
-            ENDPOINT="chat/completions"
-            shift
-            ;;
-        -g|--generate)
-            ENDPOINT="completions"
-            shift
-            ;;
-        -u|--url)
-            API_BASE_URL="$2"
-            shift 2
-            ;;
-        -h|--help)
+        -m|--model)       MODEL="$2";       shift 2 ;;
+        -t|--temperature) TEMPERATURE="$2"; shift 2 ;;
+        -l|--max-tokens)  MAX_TOKENS="$2";  shift 2 ;;
+        -s|--stream)      STREAM=true;      shift   ;;
+        -c|--chat)        ENDPOINT="chat/completions"; shift ;;
+        -g|--generate)    ENDPOINT="completions";      shift ;;
+        -u|--url)         API_BASE_URL="$2"; shift 2 ;;
+        -h|--help)        usage ;;
+        -*)
+            error "Unknown option: $1"
             usage
             ;;
         *)
@@ -106,111 +84,113 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate prompt
-if [ -z "$PROMPT" ]; then
+if [[ -z "$PROMPT" ]]; then
     error "No prompt provided"
     echo ""
     usage
 fi
 
-# Check API connectivity
+check_dependencies
+
 log "Checking API connectivity..."
-if ! curl -s --connect-timeout 5 "${API_BASE_URL}/health" > /dev/null 2>&1; then
-    if ! curl -s --connect-timeout 5 "${API_BASE_URL}/models" > /dev/null 2>&1; then
+if ! curl -sf --connect-timeout 5 "${API_BASE_URL}/health" >/dev/null 2>&1; then
+    if ! curl -sf --connect-timeout 5 "${API_BASE_URL}/models" >/dev/null 2>&1; then
         error "Cannot connect to API at ${API_BASE_URL}"
-        error "Make sure the container is running: docker ps | grep llama"
+        error "Make sure the container is running: docker ps | grep llamaedge"
         exit 1
     fi
 fi
 success "API is reachable"
 
-# Build request payload
-if [ "$ENDPOINT" = "chat/completions" ]; then
-    PAYLOAD=$(cat <<EOF
-{
-  "model": "$MODEL",
-  "messages": [
-    {
-      "role": "user",
-      "content": "$PROMPT"
-    }
-  ],
-  "temperature": $TEMPERATURE,
-  "max_tokens": $MAX_TOKENS,
-  "stream": $STREAM
-}
-EOF
-)
+if [[ "$ENDPOINT" == "chat/completions" ]]; then
+    PAYLOAD=$(jq -n \
+        --arg model "$MODEL" \
+        --arg content "$PROMPT" \
+        --argjson temperature "$TEMPERATURE" \
+        --argjson max_tokens "$MAX_TOKENS" \
+        --argjson stream "$STREAM" \
+        '{
+            model: $model,
+            messages: [{ role: "user", content: $content }],
+            temperature: $temperature,
+            max_tokens: $max_tokens,
+            stream: $stream
+        }')
 else
-    PAYLOAD=$(cat <<EOF
-{
-  "model": "$MODEL",
-  "prompt": "$PROMPT",
-  "temperature": $TEMPERATURE,
-  "max_tokens": $MAX_TOKENS,
-  "stream": $STREAM
-}
-EOF
-)
+    PAYLOAD=$(jq -n \
+        --arg model "$MODEL" \
+        --arg prompt "$PROMPT" \
+        --argjson temperature "$TEMPERATURE" \
+        --argjson max_tokens "$MAX_TOKENS" \
+        --argjson stream "$STREAM" \
+        '{
+            model: $model,
+            prompt: $prompt,
+            temperature: $temperature,
+            max_tokens: $max_tokens,
+            stream: $stream
+        }')
 fi
 
-# Display request info
 log "Sending request to ${CYAN}${API_BASE_URL}/v1/${ENDPOINT}${NC}"
 log "Model: ${CYAN}${MODEL}${NC} | Temp: ${CYAN}${TEMPERATURE}${NC} | Tokens: ${CYAN}${MAX_TOKENS}${NC}"
-log "Prompt: ${MAGENTA}${PROMPT:0:80}${NC}$([ ${#PROMPT} -gt 80 ] && echo "...")"
+log "Prompt: ${MAGENTA}${PROMPT:0:80}${NC}$([ ${#PROMPT} -gt 80 ] && echo '...')"
 echo ""
 
-# Send request and process response
-if [ "$STREAM" = true ]; then
-    # Streaming mode
+if [[ "$STREAM" == true ]]; then
     echo -e "${CYAN}Response (streaming):${NC}"
-    curl -s --max-time $TIMEOUT \
+    curl -sS --max-time "$TIMEOUT" \
         -X POST \
         -H "Content-Type: application/json" \
         "${API_BASE_URL}/v1/${ENDPOINT}" \
         -d "$PAYLOAD" | \
         while IFS= read -r line; do
             if [[ $line == data:\ * ]]; then
-                # Extract JSON from SSE format
                 json_str="${line#data: }"
-                if [ "$json_str" != "[DONE]" ] && [ -n "$json_str" ]; then
-                    # Extract content based on endpoint
-                    if [ "$ENDPOINT" = "chat/completions" ]; then
-                        echo "$json_str" | jq -r '.choices[0].delta.content // empty' 2>/dev/null || true
+                if [[ "$json_str" != "[DONE]" && -n "$json_str" ]]; then
+                    if [[ "$ENDPOINT" == "chat/completions" ]]; then
+                        echo "$json_str" | jq -rj '.choices[0].delta.content // empty' 2>/dev/null || true
                     else
-                        echo "$json_str" | jq -r '.choices[0].text // empty' 2>/dev/null || true
+                        echo "$json_str" | jq -rj '.choices[0].text // empty' 2>/dev/null || true
                     fi
                 fi
             fi
         done
+    echo ""
 else
-    # Non-streaming mode
-    RESPONSE=$(curl -s --max-time $TIMEOUT \
+    RESPONSE=$(curl -sS --max-time "$TIMEOUT" \
+        -w '\n%{http_code}' \
         -X POST \
         -H "Content-Type: application/json" \
         "${API_BASE_URL}/v1/${ENDPOINT}" \
         -d "$PAYLOAD")
-    
-    # Check if response is valid JSON
-    if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
-        error "Invalid JSON response from API"
-        echo "$RESPONSE"
+
+    HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+    BODY=$(echo "$RESPONSE" | head -n -1)
+
+    if [[ "$HTTP_CODE" -ge 400 ]]; then
+        error "API returned HTTP $HTTP_CODE"
+        echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
         exit 1
     fi
-    
-    # Extract and display response
-    if [ "$ENDPOINT" = "chat/completions" ]; then
-        CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message // "No response"')
-    else
-        CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].text // .error.message // "No response"')
+
+    if ! echo "$BODY" | jq empty 2>/dev/null; then
+        error "Invalid JSON response from API"
+        echo "$BODY"
+        exit 1
     fi
-    
+
+    if [[ "$ENDPOINT" == "chat/completions" ]]; then
+        CONTENT=$(echo "$BODY" | jq -r '.choices[0].message.content // .error.message // "No response"')
+    else
+        CONTENT=$(echo "$BODY" | jq -r '.choices[0].text // .error.message // "No response"')
+    fi
+
     echo -e "${CYAN}Response:${NC}"
     echo "$CONTENT"
-    
-    # Show token usage if available
-    USAGE=$(echo "$RESPONSE" | jq '.usage // empty' 2>/dev/null)
-    if [ -n "$USAGE" ]; then
+
+    USAGE=$(echo "$BODY" | jq '.usage // empty' 2>/dev/null)
+    if [[ -n "$USAGE" ]]; then
         echo ""
         echo -e "${BLUE}Token Usage:${NC}"
         echo "$USAGE" | jq -r '"  Prompt: \(.prompt_tokens), Completion: \(.completion_tokens), Total: \(.total_tokens)"'

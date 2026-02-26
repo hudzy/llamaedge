@@ -1,0 +1,163 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - Dockerfile
+      - .github/workflows/build.yaml
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Model to build (leave empty for all)"
+        required: false
+        type: choice
+        options:
+          - all
+          - qwen3-0.6b
+          - llama3.2-1b
+          - gemma3-1b
+          - gemma3-270m
+
+concurrency:
+  group: ${{ github.workflow }}-${{ matrix.model || 'all' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - model: qwen3-0.6b
+            model_url: https://huggingface.co/second-state/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q5_K_M.gguf
+            prompt_format: qwen3-no-think
+            context_size: "24576"
+          - model: llama3.2-1b
+            model_url: https://huggingface.co/second-state/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q5_K_M.gguf
+            prompt_format: llama-3-chat
+            context_size: "24576"
+          - model: gemma3-1b
+            model_url: https://huggingface.co/second-state/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q5_K_M.gguf
+            prompt_format: gemma-3
+            context_size: "24576"
+          - model: gemma3-270m
+            model_url: https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/main/gemma-3-270m-it-Q5_K_M.gguf
+            prompt_format: gemma-3
+            context_size: "8192"
+    if: >-
+      github.event_name == 'push' ||
+      github.event.inputs.model == 'all' ||
+      github.event.inputs.model == ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: hudzy/llamaedge
+          tags: |
+            type=raw,value=${{ matrix.model }}
+            type=raw,value=${{ matrix.model }}-{{sha}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: type=gha,scope=${{ matrix.model }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.model }}
+          build-args: |
+            MODEL_URL=${{ matrix.model_url }}
+            PROMPT_FORMAT=${{ matrix.prompt_format }}
+            CONTEXT_SIZE=${{ matrix.context_size }}
+
+  build-single:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.model != 'all' &&
+      github.event.inputs.model != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set model config
+        id: config
+        run: |
+          case "${{ github.event.inputs.model }}" in
+            qwen3-0.6b)
+              echo "model_url=https://huggingface.co/second-state/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
+              echo "prompt_format=qwen3-no-think" >> "$GITHUB_OUTPUT"
+              echo "context_size=24576" >> "$GITHUB_OUTPUT"
+              ;;
+            llama3.2-1b)
+              echo "model_url=https://huggingface.co/second-state/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
+              echo "prompt_format=llama-3-chat" >> "$GITHUB_OUTPUT"
+              echo "context_size=24576" >> "$GITHUB_OUTPUT"
+              ;;
+            gemma3-1b)
+              echo "model_url=https://huggingface.co/second-state/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
+              echo "prompt_format=gemma-3" >> "$GITHUB_OUTPUT"
+              echo "context_size=24576" >> "$GITHUB_OUTPUT"
+              ;;
+            gemma3-270m)
+              echo "model_url=https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/main/gemma-3-270m-it-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
+              echo "prompt_format=gemma-3" >> "$GITHUB_OUTPUT"
+              echo "context_size=8192" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: hudzy/llamaedge
+          tags: |
+            type=raw,value=${{ github.event.inputs.model }}
+            type=raw,value=${{ github.event.inputs.model }}-{{sha}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: type=gha,scope=${{ github.event.inputs.model }}
+          cache-to: type=gha,mode=max,scope=${{ github.event.inputs.model }}
+          build-args: |
+            MODEL_URL=${{ steps.config.outputs.model_url }}
+            PROMPT_FORMAT=${{ steps.config.outputs.prompt_format }}
+            CONTEXT_SIZE=${{ steps.config.outputs.context_size }}

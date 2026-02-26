@@ -1,0 +1,12 @@
+*.log
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+.env
+.env.*
+!.env.example
+
+*.gguf
