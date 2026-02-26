@@ -13,7 +13,7 @@ LABEL org.opencontainers.image.source="https://github.com/hudzy/llamaedge" \
       org.opencontainers.image.licenses="MIT"
 
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends curl ca-certificates git && \
+  apt-get install -y --no-install-recommends curl ca-certificates git python3 && \
   curl -sSf https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh \
     | bash -s -- --version "${WASMEDGE_VERSION}" --plugins wasi_nn-ggml wasmedge_rustls -p /usr/local && \
   apt-get purge -y --auto-remove && \
