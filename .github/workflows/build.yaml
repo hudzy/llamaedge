@@ -19,16 +19,15 @@ on:
           - gemma3-1b
           - gemma3-270m
 
-concurrency:
-  group: ${{ github.workflow }}-${{ matrix.model || 'all' }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.model }}
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
@@ -98,6 +97,9 @@ jobs:
       github.event.inputs.model != 'all' &&
       github.event.inputs.model != ''
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.inputs.model }}
+      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
