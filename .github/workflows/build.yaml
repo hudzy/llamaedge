@@ -14,7 +14,7 @@ on:
         type: choice
         options:
           - all
-          - qwen3-0.6b
+          - qwen3.5-0.8b
           - llama3.2-1b
           - gemma3-1b
           - gemma3-270m
@@ -32,8 +32,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - model: qwen3-0.6b
-            model_url: https://huggingface.co/second-state/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q5_K_M.gguf
+          - model: qwen3.5-0.8b
+            model_url: https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q5_K_M.gguf
             prompt_format: qwen3-no-think
             context_size: "24576"
           - model: llama3.2-1b
@@ -107,8 +107,8 @@ jobs:
         id: config
         run: |
           case "${{ github.event.inputs.model }}" in
-            qwen3-0.6b)
-              echo "model_url=https://huggingface.co/second-state/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
+            qwen3.5-0.8b)
+              echo "model_url=https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
               echo "prompt_format=qwen3-no-think" >> "$GITHUB_OUTPUT"
               echo "context_size=24576" >> "$GITHUB_OUTPUT"
               ;;

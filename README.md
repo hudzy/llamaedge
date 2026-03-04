@@ -14,7 +14,7 @@ LlamaEdge is a containerized solution for running lightweight Large Language Mod
 
 | Model | Size | Context | Port (Compose) |
 |-------|------|---------|-----------------|
-| Qwen 3 | 0.6B | 24,576 | 8082 |
+| Qwen 3.5 | 0.8B | 24,576 | 8082 |
 | Llama 3.2 | 1B | 24,576 | 8079 |
 | Gemma 3 | 1B | 24,576 | 8081 |
 | Gemma 3 | 270M | 8,192 | 8083 |
@@ -30,7 +30,7 @@ LlamaEdge is a containerized solution for running lightweight Large Language Mod
 ### Using Docker Compose
 
 ```bash
-# Start the Qwen 0.6B model
+# Start the Qwen 0.8B model
 docker compose --profile qwen up -d
 
 # Or start Llama 3.2
@@ -48,7 +48,7 @@ Access the service:
 ### Using the Run Script
 
 ```bash
-# Default: Qwen 0.6B on port 8082
+# Default: Qwen 0.8B on port 8082
 bash docker-run.sh
 
 # Custom model and port
@@ -62,7 +62,7 @@ bash docker-run.sh --no-pull
 
 ```bash
 make help           # Show all available targets
-make run            # Start default model (qwen3-0.6b)
+make run            # Start default model (qwen3.5-0.8b)
 make run MODEL=gemma3-1b
 make status         # Check running containers
 make logs           # Tail container logs
@@ -104,7 +104,7 @@ Query script options:
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-m, --model` | Model name | `qwen3-0.6b` |
+| `-m, --model` | Model name | `qwen3.5-0.8b` |
 | `-t, --temperature` | Temperature (0-2) | `0.7` |
 | `-l, --max-tokens` | Max tokens | `1024` |
 | `-s, --stream` | Streaming mode | off |

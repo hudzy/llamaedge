@@ -7,7 +7,7 @@ a WebAssembly LLM inference server. This is an infrastructure/DevOps repository 
 no compiled application source code (no Rust, Python, JS, etc.). The codebase consists of a
 parameterized Dockerfile, Docker Compose config, Bash scripts, a Makefile, and CI/CD workflows.
 
-Supported models: Qwen3-0.6B, Llama3.2-1B, Gemma3-1B, Gemma3-270M (all GGUF-quantized).
+Supported models: Qwen3.5-0.8B, Llama3.2-1B, Gemma3-1B, Gemma3-270M (all GGUF-quantized).
 
 ## Repository Structure
 
@@ -33,7 +33,7 @@ There is no compilation step. "Building" means creating Docker images.
 ### Build
 
 ```bash
-make build                    # Build default model image (qwen3-0.6b)
+make build                    # Build default model image (qwen3.5-0.8b)
 make build MODEL=gemma3-1b   # Build a specific model image
 make build-all                # Build all model images
 ```
@@ -43,7 +43,7 @@ Under the hood these run `docker compose build <model>`.
 ### Run
 
 ```bash
-make run                      # Start default model (qwen3-0.6b)
+make run                      # Start default model (qwen3.5-0.8b)
 make run MODEL=llama3.2-1b   # Start a specific model
 make stop                     # Stop default model
 make stop-all                 # Stop all containers
@@ -84,7 +84,7 @@ as `hudzy/llamaedge:<model-tag>`.
 
 | Make MODEL value | Docker Compose port | Profile  |
 |------------------|---------------------|----------|
-| `qwen3-0.6b`    | 8082                | qwen     |
+| `qwen3.5-0.8b`  | 8082                | qwen     |
 | `llama3.2-1b`   | 8079                | llama    |
 | `gemma3-1b`     | 8081                | gemma    |
 | `gemma3-270m`   | 8083                | gemma    |
@@ -142,14 +142,14 @@ All Bash scripts in this repo follow these patterns:
 ### Makefile Conventions
 
 - Declare all targets as `.PHONY`
-- Use `?=` for overridable variables (e.g., `MODEL ?= qwen3-0.6b`)
+- Use `?=` for overridable variables (e.g., `MODEL ?= qwen3.5-0.8b`)
 - Every target has a `## Comment` for the self-documenting `make help`
 - Use `@` prefix for display-only commands to suppress echo
 
 ### Naming Conventions
 
-- **Model identifiers:** lowercase with dots for versions: `qwen3-0.6b`, `llama3.2-1b`
-- **Container names:** `llamaedge-<model-id>` (e.g., `llamaedge-qwen3-0.6b`)
+- **Model identifiers:** lowercase with dots for versions: `qwen3.5-0.8b`, `llama3.2-1b`
+- **Container names:** `llamaedge-<model-id>` (e.g., `llamaedge-qwen3.5-0.8b`)
 - **Docker image tags:** `hudzy/llamaedge:<model-id>`
 - **Bash variables:** UPPER_SNAKE_CASE for exported/config vars, lower_snake_case for locals
 - **Makefile targets:** lowercase with hyphens (e.g., `build-all`, `stop-all`, `list-models`)

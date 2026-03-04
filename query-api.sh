@@ -11,7 +11,7 @@ readonly MAGENTA='\033[0;35m'
 readonly NC='\033[0m'
 
 API_BASE_URL="${API_BASE_URL:-http://localhost:8082}"
-MODEL="${MODEL:-qwen3-0.6b}"
+MODEL="${MODEL:-qwen3.5-0.8b}"
 TEMPERATURE="${TEMPERATURE:-0.7}"
 MAX_TOKENS="${MAX_TOKENS:-1024}"
 TIMEOUT="${TIMEOUT:-300}"

@@ -9,8 +9,8 @@ readonly BLUE='\033[0;34m'
 readonly CYAN='\033[0;36m'
 readonly NC='\033[0m'
 
-CONTAINER_NAME="${CONTAINER_NAME:-qwen3-0.6b}"
-IMAGE_NAME="${IMAGE_NAME:-hudzy/llamaedge:qwen3-0.6b}"
+CONTAINER_NAME="${CONTAINER_NAME:-qwen3.5-0.8b}"
+IMAGE_NAME="${IMAGE_NAME:-hudzy/llamaedge:qwen3.5-0.8b}"
 PORT="${PORT:-8082}"
 CPUS="${CPUS:-4.0}"
 MEMORY="${MEMORY:-6g}"
