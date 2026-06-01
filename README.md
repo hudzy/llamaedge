@@ -27,6 +27,8 @@ LlamaEdge is a containerized solution for running lightweight Large Language Mod
 - At least 4GB RAM and 4GB disk space per model
 - `curl` and `jq` for the query script
 
+The examples use Docker Compose v2 (`docker compose`). If your environment still uses the legacy standalone binary, replace `docker compose` with `docker-compose`; the Makefile auto-detects either form.
+
 ### Using Docker Compose
 
 ```bash
@@ -52,7 +54,7 @@ Access the service:
 bash docker-run.sh
 
 # Custom model and port
-bash docker-run.sh -i hudzy/llamaedge:llama3.2-1b -n llama3 -p 8079
+bash docker-run.sh -i hudzy/llamaedge:llama3.2-1b -n llamaedge-llama3.2-1b -p 8079
 
 # Skip image pull
 bash docker-run.sh --no-pull
@@ -104,7 +106,7 @@ Query script options:
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-m, --model` | Model name | `qwen3.5-0.8b` |
+| `-m, --model` | Model name or alias | `default` |
 | `-t, --temperature` | Temperature (0-2) | `0.7` |
 | `-l, --max-tokens` | Max tokens | `1024` |
 | `-s, --stream` | Streaming mode | off |
@@ -136,6 +138,13 @@ All images are built from a single parameterized `Dockerfile` and include:
 - **LlamaEdge API Server** with OpenAI-compatible REST API
 - **Pre-downloaded GGUF model**
 - Non-root user, health check, and graceful shutdown signal
+
+Default upstream versions:
+
+| Component | Version |
+|-----------|---------|
+| LlamaEdge API Server | `0.29.0` |
+| WasmEdge Runtime | `0.17.0` |
 
 Build arguments:
 
@@ -245,7 +254,7 @@ curl http://localhost:8083/v1/chat/completions ...  # Gemma 270M
 |---------|----------|
 | Container won't start | Check Docker: `docker ps`, view logs: `docker logs <name>` |
 | Port conflict | Check port: `lsof -i :<port>`, change port in compose or run script |
-| Model loading slowly | First startup downloads the model. Watch: `docker logs -f <name>` |
+| Model loading slowly | Startup can take time while the model loads into memory. Local builds download the model during image build. |
 | API timeout | Increase client timeout, reduce `max_tokens`, check: `docker stats` |
 | Out of memory | Use a smaller model or increase Docker memory limit |
 

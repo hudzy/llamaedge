@@ -9,9 +9,10 @@ on:
   workflow_dispatch:
     inputs:
       model:
-        description: "Model to build (leave empty for all)"
+        description: "Model to build"
         required: false
         type: choice
+        default: all
         options:
           - all
           - qwen3.5-0.8b

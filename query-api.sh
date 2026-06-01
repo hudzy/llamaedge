@@ -11,7 +11,7 @@ readonly MAGENTA='\033[0;35m'
 readonly NC='\033[0m'
 
 API_BASE_URL="${API_BASE_URL:-http://localhost:8082}"
-MODEL="${MODEL:-qwen3.5-0.8b}"
+MODEL="${MODEL:-default}"
 TEMPERATURE="${TEMPERATURE:-0.7}"
 MAX_TOKENS="${MAX_TOKENS:-1024}"
 TIMEOUT="${TIMEOUT:-300}"
@@ -27,7 +27,7 @@ ${CYAN}LlamaEdge OpenAI API Query Tool${NC}
 Usage: $0 [OPTIONS] "<prompt>"
 
 Options:
-  -m, --model MODEL           Model to use (default: $MODEL)
+  -m, --model MODEL           Model name or alias to use (default: $MODEL)
   -t, --temperature TEMP      Temperature 0-2 (default: $TEMPERATURE)
   -l, --max-tokens TOKENS     Max tokens to generate (default: $MAX_TOKENS)
   -s, --stream                Enable streaming mode

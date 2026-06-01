@@ -9,7 +9,7 @@ readonly BLUE='\033[0;34m'
 readonly CYAN='\033[0;36m'
 readonly NC='\033[0m'
 
-CONTAINER_NAME="${CONTAINER_NAME:-qwen3.5-0.8b}"
+CONTAINER_NAME="${CONTAINER_NAME:-llamaedge-qwen3.5-0.8b}"
 IMAGE_NAME="${IMAGE_NAME:-hudzy/llamaedge:qwen3.5-0.8b}"
 PORT="${PORT:-8082}"
 CPUS="${CPUS:-4.0}"
@@ -43,7 +43,7 @@ All options can also be set via environment variables:
 
 Examples:
   $0
-  $0 -n llama3 -i hudzy/llamaedge:llama3.2-1b -p 8079
+  $0 -n llamaedge-llama3.2-1b -i hudzy/llamaedge:llama3.2-1b -p 8079
   PORT=8081 IMAGE_NAME=hudzy/llamaedge:gemma3-1b $0
 
 EOF
@@ -83,13 +83,13 @@ if ! command -v docker >/dev/null 2>&1; then
     exit 1
 fi
 
-if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+if docker ps --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
     warn "Container '$CONTAINER_NAME' is already running"
     docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
     exit 0
 fi
 
-if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+if docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
     warn "Found stopped container '$CONTAINER_NAME', removing it..."
     docker rm "$CONTAINER_NAME" >/dev/null 2>&1
     success "Old container removed"

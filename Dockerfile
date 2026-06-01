@@ -2,7 +2,7 @@ FROM ubuntu:22.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 
 ARG LLAMAEDGE_VERSION=0.29.0
-ARG WASMEDGE_VERSION=0.16.1
+ARG WASMEDGE_VERSION=0.17.0
 ARG MODEL_URL
 ARG PROMPT_FORMAT
 ARG CONTEXT_SIZE=24576
@@ -14,15 +14,19 @@ LABEL org.opencontainers.image.source="https://github.com/hudzy/llamaedge" \
 
 RUN apt-get update && \
   apt-get install -y --no-install-recommends curl ca-certificates git python3 && \
-  curl -sSf https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh \
-    | bash -s -- --version "${WASMEDGE_VERSION}" --plugins wasi_nn-ggml wasmedge_rustls -p /usr/local && \
-  apt-get purge -y --auto-remove && \
+  curl -fSL -o /tmp/wasmedge-install.sh \
+    "https://raw.githubusercontent.com/WasmEdge/WasmEdge/${WASMEDGE_VERSION}/utils/install.sh" && \
+  bash /tmp/wasmedge-install.sh --version "${WASMEDGE_VERSION}" --plugins wasi_nn-ggml wasmedge_rustls -p /usr/local && \
+  rm -f /tmp/wasmedge-install.sh && \
+  apt-get purge -y --auto-remove git python3 && \
   rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-RUN curl -fSL -o llama-api-server.wasm \
-  "https://github.com/LlamaEdge/LlamaEdge/releases/download/${LLAMAEDGE_VERSION}/llama-api-server.wasm"
+RUN curl -fSLO "https://github.com/LlamaEdge/LlamaEdge/releases/download/${LLAMAEDGE_VERSION}/llama-api-server.wasm" && \
+  curl -fSLO "https://github.com/LlamaEdge/LlamaEdge/releases/download/${LLAMAEDGE_VERSION}/SHA256SUM" && \
+  sha256sum -c --ignore-missing SHA256SUM && \
+  rm SHA256SUM
 
 RUN MODEL_FILE="$(basename "${MODEL_URL}")" && \
   curl -fSL -o "${MODEL_FILE}" "${MODEL_URL}"
