@@ -14,22 +14,49 @@ This repository contains no application source code. It provides a parameterized
 
 ## Available Models
 
-Pre-built images: `hudzy/llamaedge:<model-id>`
+Each row is one pre-built Docker image (`hudzy/llamaedge:<model-id>`) and a matching Compose service name. Use the **model ID** with `make run MODEL=...`, `docker compose up -d <service>`, or as the image tag in `docker-run.sh -i`.
 
-| Model ID | Model | Context | Port | Compose profile | Resources |
-|----------|-------|---------|------|-----------------|-----------|
-| `qwen3.5-0.8b` | Qwen 3.5 0.8B | 24,576 | 8082 | `qwen` | 4 CPU, 6 GB RAM |
-| `llama3.2-1b` | Llama 3.2 1B | 24,576 | 8079 | `llama` | 4 CPU, 6 GB RAM |
-| `gemma3-1b` | Gemma 3 1B | 24,576 | 8081 | `gemma` | 4 CPU, 6 GB RAM |
-| `gemma3-270m` | Gemma 3 270M | 8,192 | 8083 | `gemma` | 2 CPU, 4 GB RAM |
+| Model ID | Model | Context (tokens) | Compose profile |
+|----------|-------|------------------|-----------------|
+| `qwen3.5-0.8b` | Qwen 3.5 0.8B | 24,576 | `qwen` |
+| `llama3.2-1b` | Llama 3.2 1B | 24,576 | `llama` |
+| `gemma3-1b` | Gemma 3 1B | 24,576 | `gemma` |
+| `gemma3-270m` | Gemma 3 270M | 8,192 | `gemma` |
 
-All models use Q5_K_M GGUF weights baked into the image at build time.
+All models ship as Q5_K_M GGUF weights baked into the image at build time. Context size is set at build time via `CONTEXT_SIZE` in `docker-compose.yaml`.
 
 List model IDs:
 
 ```bash
 make list-models
 ```
+
+### Default host ports and resource limits
+
+These values come from [`docker-compose.yaml`](docker-compose.yaml) and the matching defaults in [`docker-run.sh`](docker-run.sh). They are **not** fixed by the model itself — you can change them in Compose or with `docker-run.sh -p`, `-c`, and `-m`.
+
+Inside every container, the API and web UI listen on **port 8080**. The **host port** is what you use from your machine (e.g. `http://localhost:8082`).
+
+| Service / model ID | Host port → container | CPU limit | Memory limit |
+|--------------------|------------------------|-----------|--------------|
+| `qwen3.5-0.8b` | 8082 → 8080 | 4 | 6 GB |
+| `llama3.2-1b` | 8079 → 8080 | 4 | 6 GB |
+| `gemma3-1b` | 8081 → 8080 | 4 | 6 GB |
+| `gemma3-270m` | 8083 → 8080 | 2 | 4 GB |
+
+Example URLs when using the defaults above:
+
+| Model | Web UI | API base |
+|-------|--------|----------|
+| Qwen 3.5 0.8B | http://localhost:8082 | http://localhost:8082/v1 |
+| Llama 3.2 1B | http://localhost:8079 | http://localhost:8079/v1 |
+| Gemma 3 1B | http://localhost:8081 | http://localhost:8081/v1 |
+| Gemma 3 270M | http://localhost:8083 | http://localhost:8083/v1 |
+
+Chat endpoint: `POST /v1/chat/completions`
+
+> [!NOTE]
+> Compose profile `gemma` starts **both** Gemma services (`gemma3-1b` on 8081 and `gemma3-270m` on 8083). Use a service name directly (e.g. `docker compose up -d gemma3-270m`) to run just one.
 
 ## Quick Start
 
@@ -67,16 +94,7 @@ docker compose --profile gemma up -d
 docker compose --profile all up -d
 ```
 
-Access the service:
-
-| Model | Web UI | API base |
-|-------|--------|----------|
-| Qwen 3.5 0.8B | http://localhost:8082 | http://localhost:8082/v1 |
-| Llama 3.2 1B | http://localhost:8079 | http://localhost:8079/v1 |
-| Gemma 3 1B | http://localhost:8081 | http://localhost:8081/v1 |
-| Gemma 3 270M | http://localhost:8083 | http://localhost:8083/v1 |
-
-Chat endpoint: `POST /v1/chat/completions`
+See [Default host ports and resource limits](#default-host-ports-and-resource-limits) for URLs when using the repo defaults.
 
 ### Using Make
 
@@ -322,8 +340,7 @@ print(response.choices[0].message.content)
 | Storage | 8 GB | 16 GB SSD |
 | GPU | — | Optional (CPU inference by default) |
 
-> [!NOTE]
-> Gemma 3 270M runs with a 4 GB memory limit in Compose; other models use 6 GB. Allow extra headroom on the host when running multiple containers.
+Host RAM needs depend on how you run the container. The Compose defaults allocate 6 GB per 1B-class model and 4 GB for `gemma3-270m` — see [Default host ports and resource limits](#default-host-ports-and-resource-limits). Allow extra headroom on the host when running multiple containers.
 
 ## Troubleshooting
 
