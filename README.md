@@ -152,14 +152,9 @@ Equivalent environment variables: `API_BASE_URL`, `MODEL`, `TEMPERATURE`, `MAX_T
 
 ## Image Details
 
-One parameterized multi-stage `Dockerfile` builds every model image:
+One parameterized single-stage `Dockerfile` on `debian:bookworm-slim` builds every model image. WasmEdge is installed in the same stage as the runtime so its library paths and the OpenBLAS-linked `wasi_nn-ggml` plugin match what LlamaEdge expects.
 
-| Stage | Base | Purpose |
-|-------|------|---------|
-| `builder` | `debian:bookworm-slim` | Install WasmEdge, download the wasm server and GGUF weights, generate `init.sh` |
-| `runtime` | `debian:bookworm-slim` | Copy artifacts only, no build tools |
-
-Each runtime image contains WasmEdge with the `wasi_nn-ggml` and `wasmedge_rustls` plugins, `llama-api-server.wasm`, the model weights, and runs as the non-root `llamaedge` user with a health check on `/v1/models` and `STOPSIGNAL SIGTERM`.
+Each image contains WasmEdge with the `wasi_nn-ggml` plugin, `llama-api-server.wasm`, the model weights, and runs as the non-root `llamaedge` user with a health check on `/v1/models` and `STOPSIGNAL SIGTERM`. Startup sources `/usr/local/env` before launching `wasmedge`.
 
 Pinned upstream versions: LlamaEdge API Server `0.29.0`, WasmEdge `0.17.1`.
 
