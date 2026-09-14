@@ -7,6 +7,7 @@ ARG MODEL_URL
 ARG PROMPT_FORMAT
 ARG CONTEXT_SIZE=24576
 ARG TEMPERATURE=0.8
+ARG THREADS=2
 
 LABEL org.opencontainers.image.source="https://github.com/hudzy/llamaedge" \
       org.opencontainers.image.description="LlamaEdge - Run LLMs at the Edge" \
@@ -32,10 +33,12 @@ RUN curl -fSLO "https://github.com/LlamaEdge/LlamaEdge/releases/download/${LLAMA
 RUN MODEL_FILE="$(basename "${MODEL_URL}")" && \
   curl -fSL -o "${MODEL_FILE}" "${MODEL_URL}"
 
+COPY init.sh /app/init.sh
+
 RUN MODEL_FILE="$(basename "${MODEL_URL}")" && \
-  printf '#!/bin/bash\nset -e\n. /usr/local/env\nwasmedge \\\n  --dir .:. \\\n  --nn-preload "default:GGML:AUTO:%s" \\\n  llama-api-server.wasm \\\n  --prompt-template "%s" \\\n  --ctx-size "%s" \\\n  --model-name "%s" \\\n  --temp "%s" \\\n  --socket-addr 0.0.0.0:8080 \\\n  --web-ui chatbot-ui\n' \
-    "${MODEL_FILE}" "${PROMPT_FORMAT}" "${CONTEXT_SIZE}" "${MODEL_FILE}" "${TEMPERATURE}" \
-  > /app/init.sh && \
+  printf 'DEFAULT_MODEL_FILE=%s\nPROMPT_FORMAT=%s\nCONTEXT_SIZE=%s\nTEMPERATURE=%s\nDEFAULT_THREADS=%s\n' \
+    "${MODEL_FILE}" "${PROMPT_FORMAT}" "${CONTEXT_SIZE}" "${TEMPERATURE}" "${THREADS}" \
+  > /app/.defaults && \
   chmod +x /app/init.sh
 
 RUN adduser --disabled-password --gecos '' llamaedge && \

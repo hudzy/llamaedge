@@ -1,0 +1,60 @@
+models:
+  qwen3.5-0.8b:
+    model_url: https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q5_K_M.gguf
+    prompt_format: qwen3-no-think
+    context_size: 24576
+    threads: 4
+    port: 8082
+    cpus: 4.0
+    memory: 6g
+    profiles:
+      - qwen
+      - all
+
+  llama3.2-1b:
+    model_url: https://huggingface.co/second-state/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q5_K_M.gguf
+    prompt_format: llama-3-chat
+    context_size: 24576
+    threads: 4
+    port: 8079
+    cpus: 4.0
+    memory: 6g
+    profiles:
+      - llama
+      - all
+
+  gemma3-1b:
+    model_url: https://huggingface.co/second-state/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q5_K_M.gguf
+    prompt_format: gemma-3
+    context_size: 24576
+    threads: 4
+    port: 8081
+    cpus: 4.0
+    memory: 6g
+    profiles:
+      - gemma
+      - all
+
+  gemma3-270m:
+    model_url: https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/main/gemma-3-270m-it-Q5_K_M.gguf
+    prompt_format: gemma-3
+    context_size: 8192
+    threads: 2
+    port: 8083
+    cpus: 2.0
+    memory: 4g
+    profiles:
+      - gemma
+      - all
+
+  gemma4-e2b:
+    model_url: https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q5_K_M.gguf
+    prompt_format: gemma-3
+    context_size: 32768
+    threads: 4
+    port: 8084
+    cpus: 4.0
+    memory: 8g
+    profiles:
+      - gemma
+      - all

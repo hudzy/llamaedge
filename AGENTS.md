@@ -7,17 +7,22 @@ a WebAssembly LLM inference server. This is an infrastructure/DevOps repository 
 no compiled application source code (no Rust, Python, JS, etc.). The codebase consists of a
 parameterized Dockerfile, Docker Compose config, Bash scripts, a Makefile, and CI/CD workflows.
 
-Supported models: Qwen3.5-0.8B, Llama3.2-1B, Gemma3-1B, Gemma3-270M (all GGUF-quantized).
+Supported models: Qwen3.5-0.8B, Llama3.2-1B, Gemma3-1B, Gemma3-270M, Gemma4-E2B (all GGUF-quantized).
 
 ## Repository Structure
 
 ```
 .
-├── Dockerfile              # Parameterized multi-model Docker image
-├── docker-compose.yaml     # Service definitions for all models
+├── Dockerfile              # Single-stage parameterized Docker image
+├── init.sh                 # Container entrypoint with runtime overrides
+├── models.yaml             # Canonical model registry (source of truth)
+├── docker-compose.yaml     # Generated service definitions (run: make generate)
+├── scripts/
+│   └── generate-compose.sh # Generates docker-compose.yaml from models.yaml
 ├── docker-run.sh           # Standalone container runner with health checks
 ├── query-api.sh            # CLI tool for querying the OpenAI-compatible API
 ├── Makefile                # Developer workflow shortcuts
+├── .env.example            # Documented environment overrides
 ├── .editorconfig           # Formatting rules (indentation, line endings)
 ├── .github/workflows/
 │   └── build.yaml          # CI: multi-arch Docker build + push to Docker Hub
@@ -40,6 +45,16 @@ make build-all                # Build all model images
 
 Under the hood these run `docker compose build <model>`.
 
+### Model configuration
+
+All per-model settings (URLs, ports, threads, resource limits, profiles) live in
+[`models.yaml`](models.yaml). After editing it, regenerate Compose:
+
+```bash
+make generate       # Regenerate docker-compose.yaml
+make check-compose  # Verify committed compose matches models.yaml (used in CI)
+```
+
 ### Run
 
 ```bash
@@ -56,7 +71,10 @@ Or use the standalone script:
 ```bash
 bash docker-run.sh                                          # Default: Qwen on port 8082
 bash docker-run.sh -i hudzy/llamaedge:llama3.2-1b -p 8079  # Custom model
+bash docker-run.sh -f ./custom.gguf                         # Override baked-in weights
 ```
+
+Runtime overrides: `MODEL_PATH` (alternate GGUF file), `THREADS` (CPU thread count).
 
 ### Testing / Verification
 
@@ -64,6 +82,7 @@ There are no automated tests or test framework. Manual verification is done via:
 
 ```bash
 make query                              # Quick test with default prompt
+make query MODEL=llama3.2-1b            # Query using the model's port from models.yaml
 make query PROMPT="What is AI?"         # Custom prompt
 bash query-api.sh "Hello, who are you?" # Direct script usage
 bash query-api.sh -s "Stream test"      # Streaming mode
@@ -74,11 +93,12 @@ The healthcheck endpoint is `GET /v1/models` on port 8080 inside the container.
 ### CI/CD
 
 The GitHub Actions workflow (`.github/workflows/build.yaml`) triggers on:
-- Push to `master` when `Dockerfile` or the workflow file changes
+- Push to `master` when `Dockerfile`, `init.sh`, `models.yaml`, `scripts/generate-compose.sh`, or the workflow file changes
 - Manual `workflow_dispatch` (select a single model or all)
 
-It builds multi-arch images (`linux/amd64`, `linux/arm64`) and pushes to Docker Hub
-as `hudzy/llamaedge:<model-tag>`.
+A `prepare` job reads `models.yaml` to build the CI matrix dynamically and runs
+`make check-compose` to catch drift. It builds multi-arch images (`linux/amd64`,
+`linux/arm64`) and pushes to Docker Hub as `hudzy/llamaedge:<model-tag>`.
 
 ### Available Models and Ports
 
@@ -88,6 +108,7 @@ as `hudzy/llamaedge:<model-tag>`.
 | `llama3.2-1b`   | 8079                | llama    |
 | `gemma3-1b`     | 8081                | gemma    |
 | `gemma3-270m`   | 8083                | gemma    |
+| `gemma4-e2b`    | 8084                | gemma    |
 
 List all models: `make list-models`
 
@@ -134,8 +155,10 @@ All Bash scripts in this repo follow these patterns:
 
 ### Docker Compose Conventions
 
+- Generated from `models.yaml` via `make generate` — do not edit services by hand
 - Each service uses `profiles` for selective startup
 - Set resource limits (`cpus`, `mem_limit`) per service
+- Include explicit `healthcheck` blocks matching the Dockerfile
 - Use `restart: unless-stopped`
 - Container names follow pattern: `llamaedge-<model-name>`
 

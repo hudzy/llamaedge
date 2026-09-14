@@ -16,6 +16,8 @@ CPUS="${CPUS:-4.0}"
 MEMORY="${MEMORY:-6g}"
 HEALTH_CHECK_TIMEOUT="${HEALTH_CHECK_TIMEOUT:-60}"
 PULL="${PULL:-true}"
+MODEL_FILE=""
+MODEL_MOUNT_PATH="/app/models/override.gguf"
 
 log()     { echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"; }
 success() { echo -e "${GREEN}[ok] $1${NC}"; }
@@ -36,6 +38,7 @@ Options:
   -m, --memory MEM       Memory limit (default: $MEMORY)
   -t, --timeout SECS     Health check timeout (default: $HEALTH_CHECK_TIMEOUT)
       --no-pull          Skip pulling the image
+  -f, --model-file PATH  Mount a host GGUF file to override the baked-in model
   -h, --help             Show this help
 
 All options can also be set via environment variables:
@@ -45,6 +48,7 @@ Examples:
   $0
   $0 -n llamaedge-llama3.2-1b -i hudzy/llamaedge:llama3.2-1b -p 8079
   PORT=8081 IMAGE_NAME=hudzy/llamaedge:gemma3-1b $0
+  $0 -f ./custom-model.gguf -i hudzy/llamaedge:qwen3.5-0.8b
 
 EOF
     exit 0
@@ -59,6 +63,7 @@ while [[ $# -gt 0 ]]; do
         -m|--memory)  MEMORY="$2";         shift 2 ;;
         -t|--timeout) HEALTH_CHECK_TIMEOUT="$2"; shift 2 ;;
         --no-pull)    PULL=false;          shift   ;;
+        -f|--model-file) MODEL_FILE="$2"; shift 2 ;;
         -h|--help)    usage ;;
         *)
             error "Unknown option: $1"
@@ -81,6 +86,15 @@ trap cleanup EXIT INT TERM
 if ! command -v docker >/dev/null 2>&1; then
     error "Docker is not installed or not in PATH"
     exit 1
+fi
+
+if [[ -n "$MODEL_FILE" ]]; then
+    if [[ ! -f "$MODEL_FILE" ]]; then
+        error "Model file not found: $MODEL_FILE"
+        exit 1
+    fi
+    MODEL_FILE="$(cd "$(dirname "$MODEL_FILE")" && pwd)/$(basename "$MODEL_FILE")"
+    log "Model override: ${CYAN}${MODEL_FILE}${NC}"
 fi
 
 if docker ps --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
@@ -111,18 +125,27 @@ if [[ "$PULL" == true ]]; then
 fi
 
 log "Creating and starting container..."
-if ! CONTAINER_ID=$(docker run -d \
-    --name "$CONTAINER_NAME" \
-    -p "${PORT}:8080" \
-    --cpus="$CPUS" \
-    --memory="$MEMORY" \
-    --restart unless-stopped \
-    --health-cmd='curl -f http://localhost:8080/v1/models || exit 1' \
-    --health-interval=30s \
-    --health-timeout=10s \
-    --health-start-period=60s \
-    --health-retries=3 \
-    "$IMAGE_NAME"); then
+docker_args=(
+    --name "$CONTAINER_NAME"
+    -p "${PORT}:8080"
+    --cpus="$CPUS"
+    --memory="$MEMORY"
+    --restart unless-stopped
+    --health-cmd='curl -f http://localhost:8080/v1/models || exit 1'
+    --health-interval=30s
+    --health-timeout=10s
+    --health-start-period=60s
+    --health-retries=3
+)
+
+if [[ -n "$MODEL_FILE" ]]; then
+    docker_args+=(
+        -v "${MODEL_FILE}:${MODEL_MOUNT_PATH}:ro"
+        -e "MODEL_PATH=${MODEL_MOUNT_PATH}"
+    )
+fi
+
+if ! CONTAINER_ID=$(docker run -d "${docker_args[@]}" "$IMAGE_NAME"); then
     error "Failed to start container"
     exit 1
 fi
@@ -163,6 +186,5 @@ echo ""
 log "Container Status:"
 docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo ""
-log "API:    ${CYAN}http://localhost:${PORT}/v1/chat/completions${NC}"
-log "Web UI: ${CYAN}http://localhost:${PORT}${NC}"
+log "API: ${CYAN}http://localhost:${PORT}/v1/chat/completions${NC}"
 success "Setup complete!"

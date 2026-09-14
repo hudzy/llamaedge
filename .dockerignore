@@ -8,5 +8,6 @@ LICENSE
 Makefile
 *.txt
 *.sh
+!init.sh
 .DS_Store
 .env*

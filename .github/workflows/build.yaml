@@ -5,6 +5,9 @@ on:
     branches: [master]
     paths:
       - Dockerfile
+      - init.sh
+      - models.yaml
+      - scripts/generate-compose.sh
       - .github/workflows/build.yaml
   workflow_dispatch:
     inputs:
@@ -19,41 +22,61 @@ on:
           - llama3.2-1b
           - gemma3-1b
           - gemma3-270m
+          - gemma4-e2b
 
 permissions:
   contents: read
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Verify docker-compose.yaml
+        run: make check-compose
+
+      - name: Set build matrix
+        id: set-matrix
+        run: |
+          selected="${{ github.event.inputs.model }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "$selected" && "$selected" != "all" ]]; then
+            matrix=$(yq -o=json -I=0 "
+              .models[\"${selected}\"] as \$m |
+              if \$m == null then error(\"unknown model: ${selected}\") else
+              {\"include\": [{\"model\": \"${selected}\", \"model_url\": \$m.model_url, \"prompt_format\": \$m.prompt_format, \"context_size\": (\$m.context_size | tostring), \"threads\": (\$m.threads | tostring)}]}
+              end
+            " models.yaml)
+          else
+            matrix=$(yq -o=json -I=0 '
+              {"include": [.models | to_entries | .[] | {
+                "model": .key,
+                "model_url": .value.model_url,
+                "prompt_format": .value.prompt_format,
+                "context_size": (.value.context_size | tostring),
+                "threads": (.value.threads | tostring)
+              }]}
+            ' models.yaml)
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: prepare
     runs-on: ubuntu-latest
     concurrency:
       group: ${{ github.workflow }}-${{ matrix.model }}
       cancel-in-progress: true
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - model: qwen3.5-0.8b
-            model_url: https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q5_K_M.gguf
-            prompt_format: qwen3-no-think
-            context_size: "24576"
-          - model: llama3.2-1b
-            model_url: https://huggingface.co/second-state/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q5_K_M.gguf
-            prompt_format: llama-3-chat
-            context_size: "24576"
-          - model: gemma3-1b
-            model_url: https://huggingface.co/second-state/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q5_K_M.gguf
-            prompt_format: gemma-3
-            context_size: "24576"
-          - model: gemma3-270m
-            model_url: https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/main/gemma-3-270m-it-Q5_K_M.gguf
-            prompt_format: gemma-3
-            context_size: "8192"
-    if: >-
-      github.event_name == 'push' ||
-      github.event.inputs.model == 'all' ||
-      github.event.inputs.model == ''
-
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -90,75 +113,4 @@ jobs:
             MODEL_URL=${{ matrix.model_url }}
             PROMPT_FORMAT=${{ matrix.prompt_format }}
             CONTEXT_SIZE=${{ matrix.context_size }}
-
-  build-single:
-    if: >-
-      github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.model != 'all' &&
-      github.event.inputs.model != ''
-    runs-on: ubuntu-latest
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.event.inputs.model }}
-      cancel-in-progress: true
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set model config
-        id: config
-        run: |
-          case "${{ github.event.inputs.model }}" in
-            qwen3.5-0.8b)
-              echo "model_url=https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
-              echo "prompt_format=qwen3-no-think" >> "$GITHUB_OUTPUT"
-              echo "context_size=24576" >> "$GITHUB_OUTPUT"
-              ;;
-            llama3.2-1b)
-              echo "model_url=https://huggingface.co/second-state/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
-              echo "prompt_format=llama-3-chat" >> "$GITHUB_OUTPUT"
-              echo "context_size=24576" >> "$GITHUB_OUTPUT"
-              ;;
-            gemma3-1b)
-              echo "model_url=https://huggingface.co/second-state/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
-              echo "prompt_format=gemma-3" >> "$GITHUB_OUTPUT"
-              echo "context_size=24576" >> "$GITHUB_OUTPUT"
-              ;;
-            gemma3-270m)
-              echo "model_url=https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/main/gemma-3-270m-it-Q5_K_M.gguf" >> "$GITHUB_OUTPUT"
-              echo "prompt_format=gemma-3" >> "$GITHUB_OUTPUT"
-              echo "context_size=8192" >> "$GITHUB_OUTPUT"
-              ;;
-          esac
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          username: hudzy
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: hudzy/llamaedge
-          tags: |
-            type=raw,value=${{ github.event.inputs.model }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          cache-from: type=gha,scope=${{ github.event.inputs.model }}
-          cache-to: type=gha,mode=max,scope=${{ github.event.inputs.model }}
-          build-args: |
-            MODEL_URL=${{ steps.config.outputs.model_url }}
-            PROMPT_FORMAT=${{ steps.config.outputs.prompt_format }}
-            CONTEXT_SIZE=${{ steps.config.outputs.context_size }}
+            THREADS=${{ matrix.threads }}
